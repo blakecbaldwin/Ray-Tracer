@@ -5,52 +5,272 @@
 /// Uncomment these lines if you want to debug using couts
 #include <iostream>
 #include <vector>
+#include <algorithm>
 #include "Vector3.hpp"
 #include "Triangle.hpp"
-#include "file_util.h"
 #include "checker_shader.h"
 
 using namespace std;
 
+/// Width of the final image
+const int w = 640;
+
+/// Height of the final image
+const int h = 640;
+
+/// The 1d array for storing the pixel we have generated
+unsigned char pixels[w * h * 3];
+
+// Left Wall
+Triangle triangle01 = Triangle{Vector3{-1, 1, -2}, Vector3{-1, 1, -1}, Vector3{-1, -1, -2}};
+Triangle triangle02 = Triangle{Vector3{-1, 1, -1}, Vector3{-1, -1, -1}, Vector3{-1, -1, -2}};
+
+// Right Wall
+Triangle triangle03 = Triangle{Vector3{1, 1, -1}, Vector3{1, 1, -2}, Vector3{1, -1, -2}};
+Triangle triangle04 = Triangle{Vector3{1, -1, -1}, Vector3{1, 1, -1}, Vector3{1, -1, -2}};
+
+// Top Wall
+Triangle triangle05 = Triangle{Vector3{-1, 1, -1}, Vector3{-1, 1, -2}, Vector3{1, 1, -2}};
+Triangle triangle06 = Triangle{Vector3{1, 1, -1}, Vector3{-1, 1, -1}, Vector3{1, 1, -2}};
+
+// Bottom Wall
+Triangle triangle07 = Triangle{Vector3{-1, -1, -2}, Vector3{-1, -1, -1}, Vector3{1, -1, -2}};
+Triangle triangle08 = Triangle{Vector3{-1, -1, -1}, Vector3{1, -1, -1}, Vector3{1, -1, -2}};
+
+// Back Wall
+Triangle triangle09 = Triangle{Vector3{-1, 1, -2}, Vector3{-1, -1, -2}, Vector3{1, -1, -2}};
+Triangle triangle10 = Triangle{Vector3{1, 1, -2}, Vector3{-1, 1, -2}, Vector3{1, -1, -2}};
+
+vector<Triangle> triangles = {
+    triangle01, triangle02,
+    triangle03, triangle04,
+    triangle05, triangle06,
+    triangle07, triangle08,
+    triangle09, triangle10};
+
+Vector3 background_color = Vector3{35, 35, 40};
+
+// const float INFINITY = 1000000;
+
+float trace_ray_distance(Vector3 origin, Vector3 direction)
+{
+  float closest_t = INFINITY;
+
+  for (const Triangle &triangle : triangles)
+  {
+
+    // Find where we hit the plane
+    Vector3 edge_one = triangle.one - triangle.two;
+    Vector3 edge_two = triangle.three - triangle.two;
+    Vector3 p = edge_two.cross(edge_one);
+    Vector3 abc = p.normalize();
+    float d = -abc.dot(triangle.one);
+
+    float t = -(abc.dot(origin) + d) / abc.dot(direction);
+
+    if (t > closest_t || t <= 0)
+      continue;
+
+    // cout << abc << " " << d << " " << t << endl;
+
+    Vector3 collision_point = direction * t + origin;
+
+    Vector3 minus_one = collision_point - triangle.one;
+    Vector3 minus_two = collision_point - triangle.two;
+    Vector3 minus_three = collision_point - triangle.three;
+
+    float triangle_area = p.length() / 2;
+
+    float area_one = minus_two.cross(minus_three).length() / 2;
+    float area_two = minus_three.cross(minus_one).length() / 2;
+    float area_three = minus_one.cross(minus_two).length() / 2;
+
+    float u = area_one / triangle_area;
+    float v = area_two / triangle_area;
+    float a = area_three / triangle_area;
+
+    float sum = u + v + a;
+
+    float diff = abs(1 - sum);
+
+    if (diff > .00001 || isnan(sum))
+    {
+      // I'm not in the triangle
+    }
+    else
+    {
+      // I'm in the triangle
+      closest_t = t;
+
+      
+     
+    }
+  }
+  return closest_t;
+}
+
+
+Vector3 trace_ray(Vector3 origin, Vector3 direction, int bounces = 2000)
+{
+  Vector3 color = Vector3{background_color.x, background_color.y, background_color.z};
+  if(bounces <= 0)
+    return background_color;
+
+  float closest_t = 1000000;
+
+  for (const Triangle &triangle : triangles)
+  {
+
+    // Find where we hit the plane
+    Vector3 edge_one = triangle.one - triangle.two;
+    Vector3 edge_two = triangle.three - triangle.two;
+    Vector3 p = edge_two.cross(edge_one);
+    Vector3 abc = p.normalize();
+    float d = -abc.dot(triangle.one);
+
+    float t = -(abc.dot(origin) + d) / abc.dot(direction);
+
+    if (t > closest_t || t <= 0)
+      continue;
+
+    // cout << abc << " " << d << " " << t << endl;
+
+    Vector3 collision_point = direction * t + origin;
+
+    Vector3 minus_one = collision_point - triangle.one;
+    Vector3 minus_two = collision_point - triangle.two;
+    Vector3 minus_three = collision_point - triangle.three;
+
+    float triangle_area = p.length() / 2;
+
+    float area_one = minus_two.cross(minus_three).length() / 2;
+    float area_two = minus_three.cross(minus_one).length() / 2;
+    float area_three = minus_one.cross(minus_two).length() / 2;
+
+    float u = area_one / triangle_area;
+    float v = area_two / triangle_area;
+    float a = area_three / triangle_area;
+
+    float sum = u + v + a;
+
+    float diff = abs(1 - sum);
+
+    if (diff > .00001 || isnan(sum))
+    {
+      // I'm not in the triangle
+    }
+    else
+    {
+      // I'm in the triangle
+      closest_t = t;
+
+      Vector3 base_color = Vector3{255, 255, 255};
+      base_color = triangle.color;
+
+      // Use height so the gradient doesn't restart on the second triangle
+      if (triangle.use_gradient_shader)
+      {
+        Vector3 blue = Vector3{110, 185, 255};
+        Vector3 white = Vector3{255, 255, 255};
+        float blend = (collision_point.y + 1) / 2;
+
+        base_color = blue * (1 - blend) + white * blend;
+      }
+      if (triangle.use_mountain_shader)
+      {
+        Vector3 brown = Vector3{145, 95, 50};
+        Vector3 green = Vector3{80, 170, 70};
+        Vector3 blue = Vector3{110, 185, 255};
+        float blend = collision_point.y + 1;
+
+        // Blend the lower and upper halves separately to use all three colors
+        if (blend < 1)
+        {
+          base_color = brown * (1 - blend) + green * blend;
+        }
+        else
+        {
+          blend = blend - 1;
+          base_color = green * (1 - blend) + blue * blend;
+        }
+      }
+      if (triangle.use_checker_shader)
+      {
+        if (checkerIsWhite(collision_point.x, collision_point.z))
+        {
+          base_color = Vector3{255, 255, 255};
+        }
+        else
+        {
+          base_color = Vector3{0, 0, 0};
+        }
+      }
+      Vector3 light_direction = Vector3{-.25, .25, 1}.normalize();
+
+      Vector3 ambient = base_color * .4;
+      Vector3 normal = p.normalize();
+
+      float strength = max(0.f, light_direction.dot(normal));
+      // float strength = abs(light_direction.dot(normal));
+
+      Vector3 diffuse = base_color * strength;
+      diffuse *= .6;
+      // Move a little off the surface so the next ray doesn't hit the same spot
+      Vector3 ray_origin = collision_point + normal * 0.0001f;
+      if(trace_ray_distance(ray_origin, light_direction) != INFINITY){
+        diffuse = Vector3{0,0,0};
+      }
+
+
+      Vector3 reflective = Vector3{0, 0, 0};
+
+      if(triangle.reflectivity > 0){
+        Vector3 reflective_direction = direction - normal * 2 * normal.dot(direction);
+        // Split the color between the surface and its reflection
+        reflective = trace_ray(ray_origin, reflective_direction, bounces - 1) * triangle.reflectivity;
+        diffuse *= 1 - triangle.reflectivity;
+        ambient *= 1 - triangle.reflectivity;
+
+      }
+
+      Vector3 _color = ambient + diffuse + reflective;
+
+      color = _color;
+     
+    }
+  }
+  return color;
+}
+
 int main()
 {
+  triangles[6].use_checker_shader = true;
+  triangles[7].use_checker_shader = true;
+  triangles[0].use_mountain_shader = true;
+  triangles[1].use_mountain_shader = true;
 
-  ///Demonstrate file_util
-  vector<string> lines = readLines("simple.obj");
-  for(const string& line : lines){
-    cout << line << endl;
-    vector<string> parts = split(line, ' ');
-    cout << parts[0] << endl;
-  }
+  triangles[4].color = Vector3{35, 65, 125};
+  triangles[5].color = Vector3{35, 65, 125};
+  triangles[8].use_gradient_shader = true;
+  triangles[9].use_gradient_shader = true;
 
-
-
+  // Use the same setting for both triangles in each wall
+  triangles[0].reflectivity = 0.0f;
+  triangles[1].reflectivity = 0.0f;
+  triangles[2].reflectivity = 0.85f;
+  triangles[3].reflectivity = 0.85f;
+  triangles[4].reflectivity = 0.0f;
+  triangles[5].reflectivity = 0.0f;
+  triangles[6].reflectivity = 0.25f;
+  triangles[7].reflectivity = 0.25f;
+  triangles[8].reflectivity = 0.0f;
+  triangles[9].reflectivity = 0.0f;
   /// Example of how to debug with couts.
   /// You must uncomment the include and namespace lines above
-  // cout << "Hello, world" << endl;
 
-  Vector3 temp = Vector3{0, 0, 0};
-  temp += Vector3{1, 1, 1};
-
-  // cout << temp << endl;
-
-  /// Width of the final image
-  const int w = 640;
-
-  /// Height of the final image
-  const int h = 640;
-
-  /// The 1d array for storing the pixel we have generated
-  unsigned char pixels[w * h * 3];
-
-  Triangle triangle = Triangle{Vector3{-1, 1, 0}, Vector3{-1, -1, 0}, Vector3{1, -1, 0}};
-  Triangle triangle2 = Triangle{Vector3{1, 1, .5}, Vector3{-1, -1, -.5}, Vector3{1, -1, .5}};
-
-  triangle.use_checker_shader = true;
-
-  vector<Triangle> triangles = {triangle, triangle2};
-
-  Vector3 background_color = Vector3{35, 35, 40};
+  Vector3 camera_origin = Vector3{0, 0, 1};
+  Vector3 camera_look_at = Vector3{0, 0, 0};
+  Vector3 camera_up = Vector3{0, 1, 0};
 
   /// Loop over each line doing down
   for (int y = 0; y < h; y++)
@@ -72,103 +292,21 @@ int main()
       unsigned char b = background_color.z;
 
       // How do I ray trace?
-      Vector3 camera_origin = Vector3{0, 0, 1};
-      Vector3 camera_look_at = Vector3{0, 0, 0};
-      Vector3 camera_up = Vector3{0, 1, 0};
 
-      // Map the pixel to the image plane, with y flipped for image coordinates.
       Vector3 target{
           x / (float)w * 2 - 1, -(y / (float)h * 2 - 1), 0};
 
-      // cout<<"One"<<endl;
+      // Zoom in a little so the room fills the image
+      target *= 0.55f;
+
       Vector3 temp = (target - camera_origin);
-      // cout<<temp<<endl;
-      // With a unit direction, t measures distance from the camera.
       Vector3 ray = temp.normalize();
-      // cout << ray << endl;
-      // cout<<"Two"<<endl;
 
+      Vector3 color = trace_ray(camera_origin, ray);
 
-      float closest_t = 1000000;
-
-      for (const Triangle &triangle : triangles)
-      {
-
-        // Find where we hit the plane
-        Vector3 edge_one = triangle.one - triangle.two;
-        Vector3 edge_two = triangle.three - triangle.two;
-        Vector3 p = edge_two.cross(edge_one);
-        Vector3 abc = p.normalize();
-        float d = -abc.dot(triangle.one);
-
-        // This finds a hit on the plane. The area check below tests whether it is inside the triangle.
-        float t = -(abc.dot(camera_origin) + d) / abc.dot(ray);
-
-        if(t > closest_t)
-          continue;
-        
-
-        // cout << abc << " " << d << " " << t << endl;
-
-        Vector3 collision_point = ray * t + camera_origin;
-
-        Vector3 minus_one = collision_point - triangle.one;
-        Vector3 minus_two = collision_point - triangle.two;
-        Vector3 minus_three = collision_point - triangle.three;
-
-        float triangle_area = p.length() / 2;
-
-        float area_one = minus_two.cross(minus_three).length() / 2;
-        float area_two = minus_three.cross(minus_one).length() / 2;
-        float area_three = minus_one.cross(minus_two).length() / 2;
-
-        // Area ratios give the corner weights. For an inside hit, they should add up to 1.
-        float u = area_one / triangle_area;
-        float v = area_two / triangle_area;
-        float a = area_three / triangle_area;
-
-        float sum = u + v + a;
-
-        float diff = abs(1 - sum);
-
-        if (diff > .00001)
-        {
-          // I'm not in the triangle
-        }
-        else
-        {
-          // I'm in the triangle
-          // Keep the nearest hit so overlapping triangles draw in the right order.
-          closest_t = t;
-
-          // Use the same weights to blend the three corner colors.
-          r = 255 * u + 0 * v + 255 * a;
-          g = 255 * u + 255 * v + 0 * a;
-          b = 0 * u + 0 * v + 0 * a;
-
-          // Blend blue, pink, and orange at the three corners.
-          r = 40 * u + 255 * v + 255 * a;
-          g = 100 * u + 90 * v + 150 * a;
-          b = 255 * u + 180 * v + 30 * a;
-
-          // Use solid checker colors only on the triangle with the shader enabled.
-          if (triangle.use_checker_shader)
-          {
-            if (checkerIsWhite(collision_point.x, collision_point.y))
-            {
-              r = 240;
-              g = 240;
-              b = 240;
-            }
-            else
-            {
-              r = 30;
-              g = 90;
-              b = 200;
-            }
-          }
-        }
-      }
+      r = color.x;
+      g = color.y;
+      b = color.z;
 
       /// Assign the r, g, and b values to the pixel at index
       pixels[index] = r;
