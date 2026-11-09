@@ -9,6 +9,7 @@
 #include "Vector3.hpp"
 #include "Triangle.hpp"
 #include "checker_shader.h"
+#include "obj_loader.h"
 
 using namespace std;
 
@@ -110,7 +111,7 @@ float trace_ray_distance(Vector3 origin, Vector3 direction)
 }
 
 
-Vector3 trace_ray(Vector3 origin, Vector3 direction, int bounces = 2000)
+Vector3 trace_ray(Vector3 origin, Vector3 direction, int bounces = 5)
 {
   Vector3 color = Vector3{background_color.x, background_color.y, background_color.z};
   if(bounces <= 0)
@@ -176,24 +177,6 @@ Vector3 trace_ray(Vector3 origin, Vector3 direction, int bounces = 2000)
 
         base_color = blue * (1 - blend) + white * blend;
       }
-      if (triangle.use_mountain_shader)
-      {
-        Vector3 brown = Vector3{145, 95, 50};
-        Vector3 green = Vector3{80, 170, 70};
-        Vector3 blue = Vector3{110, 185, 255};
-        float blend = collision_point.y + 1;
-
-        // Blend the lower and upper halves separately to use all three colors
-        if (blend < 1)
-        {
-          base_color = brown * (1 - blend) + green * blend;
-        }
-        else
-        {
-          blend = blend - 1;
-          base_color = green * (1 - blend) + blue * blend;
-        }
-      }
       if (triangle.use_checker_shader)
       {
         if (checkerIsWhite(collision_point.x, collision_point.z))
@@ -246,8 +229,8 @@ int main()
 {
   triangles[6].use_checker_shader = true;
   triangles[7].use_checker_shader = true;
-  triangles[0].use_mountain_shader = true;
-  triangles[1].use_mountain_shader = true;
+  triangles[0].use_gradient_shader = true;
+  triangles[1].use_gradient_shader = true;
 
   triangles[4].color = Vector3{35, 65, 125};
   triangles[5].color = Vector3{35, 65, 125};
@@ -265,6 +248,16 @@ int main()
   triangles[7].reflectivity = 0.25f;
   triangles[8].reflectivity = 0.0f;
   triangles[9].reflectivity = 0.0f;
+
+  // Scale the monkey to fit in the room and place it just above the floor
+  vector<Triangle> monkey = loadObj("monkey.obj", 0.5f, Vector3{-0.1f, -0.5f, -1.5f});
+  for (Triangle &triangle : monkey)
+  {
+    triangle.color = Vector3{240, 145, 65};
+    triangle.reflectivity = 0.0f;
+    triangles.push_back(triangle);
+  }
+  cout << "Loaded " << monkey.size() << " monkey triangles" << endl;
   /// Example of how to debug with couts.
   /// You must uncomment the include and namespace lines above
 
